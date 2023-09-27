@@ -1,0 +1,303 @@
+/*
+------------------------------------------------------------------------------
+NOTE.on each of client request/message/sound/packet has a client sent include RandomCodeSession,ClientDatenTime on header
+NOTE.on each of client request/message/sound/packet has a client sent will check is that client is exist? id/code/etc.is ok?
+
+
+CLIENT REQUEST CODES:
+  01.connect to the server
+  02.disconnect from server
+  03.send identity
+  04.connect to the channel
+  05.leave the channel
+  06.send entered channel password
+  07.send text message to the channel
+  08.send voice message to the channel
+  09.create channel
+  10.delete channel
+  11.update channel
+
+
+SERVER RESPONSE:
+  A.connected (ALL)
+  B.tell client reconnected. (ALL)
+  C.disconnected (ALL)
+  D.connection refeused / unknown request (SELF)
+  E.you're banned, when tryin to connnect to the server (SELF)
+  F.generate a RandomCodeSession (SELF)
+  G.channels detail (incude clients in channel) (SELF)
+
+  H.text message (CHANNEL)
+  I.voice message (CHANNEL)
+
+  J.give me channel password (SELF)
+  K.invalid channel id received, retry.. (SELF)
+  L.joined to the channel (ALL)
+  M.leaved the channel (ALL)
+  N.incorrect passwrod for the channel (SELF)
+  O.text message: channel is empty, no one cant hear you. (SELF)
+  P.text message: tell client you are not in a channel (SELF)
+  Q.voice message: tell client no one hears you.. you are alone in channel (SELF)
+  R.voice message: tell client you are not in a channel (SELF)
+  S.channel created. (ALL)
+  T.channel deleted. (ALL)
+  V.channel updated. (ALL)
+  U.client banned/kicked (ALL)
+  W.you are not admin no permission  (SELF)
+
+
+
+ADMIN/CLIENT REQUEST TO UPDATE CHANNEL:
+  client send his identity and RandomCodeSession and channel_id , channel_title, channel_password, channel_position_order
+  if identity and RandomCodeSession are linked as same on database
+    if channel_id exists
+      update channel information
+      tell people channel updated. send detail to them
+    else
+      invalid channel id try again
+  else
+    client is not admin no permission
+
+
+
+ADMIN/CLIENT REQUEST TO DELETE CHANNEL:
+  client send his identity and RandomCodeSession and channel id
+    if identity and RandomCodeSession are linked as same on database
+      if channel_id exists
+        delete that channel via id
+        tell people channel deleted. send detail to them
+      else
+        invalid channel id try again
+    else
+      client is not admin no permission
+
+
+ADMIN/CLIENT REQUEST TO CREATE CHANNEL:
+  client send his identity and RandomCodeSession and channel_title, channel_password, channel_position_order
+    if identity and RandomCodeSession are linked as same on database
+      if client id is admin
+        create a channel with those detials
+        tell people channel created. send detail to them
+      else
+        client is not admin no permission
+
+
+CLIENT REQUEST TO DISCONNECT FROM THE SERVER:
+  client send rquest to disconnect,
+    if client RandomCodeSession is eixsts on 'connected clients'
+      remove that client from list
+        if client were in a channel and that channel is not empty
+          tell poeple in channel client disconnected
+    else
+      that client does not exist so he is not connected cant be disconnect.
+
+
+CLIENT REQUEST TO JOIN/RECONNECT THE SERVER
+    client send his identity and RandomCodeSessionClientSent to the server
+    server check that identity is existant:
+      if not exist:
+        add this client to clients table
+      else:
+        this client 'connection count++'
+        server check 'ban list' table searches for that client id
+          if client id exist:
+            send details to this client you're banned and tell the reason,unban date
+          else:
+            if RandomCodeSessionClientSent == null
+              genrate a 'random session code' send to the client
+              if client id is exist in 'connected clients'
+                drop that client id record
+              add this client to the 'connected clients' table put/save (ip,port,randomCode)
+
+            else
+              if RandomCodeSessionClientSent is exist on 'connected clients' and belongs to that client id or identity
+                tell client and poeple reconnected.
+                update status client from connection lost or etc in connnected clients table
+            send channels detail (title,position,locked-status,clients inside) command/codes to the client to render for UI
+
+            if identity is admin
+              show management panel or buttons
+
+
+      CLEINT DESIDE/CLIECKED to join a channel:
+        client send request/command/code to the server for that channel_id to join.
+        if channel id valid?
+          if channel locked?
+            tell client send me password for join u to the channel
+          else
+            boradcast tell clients in that old channel client.id is left the channel
+            leave client from old channel if exists
+            join client to the channel_id
+
+
+        CLIENT SEND PASSOWRD TO THE SERVER for join a channel:
+          if password == password.channel_id
+            join that client to the channel
+          else
+            tell client incorrect password
+
+
+        CLEINT SEND TEXT MESSAGE IN CHANNEL:
+        if text_message.length > TEXT_MESSAGE_LIMIT
+          text_message = cut that more charecters from message.
+          if channel id is valid:
+              if connected_clients.channel_id.sum or count is > 1
+                broadcast text message to all clients in side that channel (even him self receive text message)
+              else
+                tell client no one cant hear you.
+          else
+            tell client you are not in a channel
+
+
+
+        CLIENT SEND VOICE MESSAGE IN CHANNEL:
+          if client channeld_id is not empty or null
+            if channel_id.clients.count <= 1:
+              tell client no one hears you.. you are alone in channel
+            else
+              broadcast voice to all client inside that channel_id except sender and muted speaker and connection lost people.
+          else
+            tell client you are not in a channel
+
+
+
+
+  Channel Text Messages
+  {
+    id,
+    channelid,
+    client_id,
+    message_text,
+    date n time
+  }
+
+  Channels
+  {
+    id,
+    title,
+    password,
+    position (order to pos-list)
+  }
+
+  Admins
+  {
+    id,
+    client_id,
+    submit date n time
+  }
+
+  Connected clients [RAM]
+  {
+    client_id, PRIMARYKEY FORRIGENKEY
+    ip,
+    port,
+    channel_connected_id, FORRIGENKEY
+    random session hash code, PRIMARY
+    -------last time activity,
+    ping ---> connection lost.
+
+    speaker muted,
+    microphone muted,
+    ------afk/away
+  }
+
+  Ban list
+  {
+    client_id,
+    reason,
+    admin_id,
+    banDuration,
+    commit date n time
+  }
+
+  Clients
+  {
+    id, PRIMARYKEY
+    nickname,
+    identity, PRIMARKEY
+    connection count,
+    account creation date n time
+  }
+
+
+
+
+CLASSES:
+---------------------------------------------------
+    database:
+    #define database_name "example.db"
+  private:
+    sqlite3* db;
+    char* errMsg = nullptr;
+    static int callback_for_queries(...);
+  public:
+  constructor() -> open db
+  destructor() -> close db
+
+      void init() //check for table and database existsant
+
+      //insert
+      bool insert_text_message(sender id , text);
+      bool create_channel(title,password,orderPos);
+      bool new_admin(client id);
+      bool ban_client(client id, admin id, reaseon, banDuration);
+      bool new_client(nickname, identity);
+
+      //delete
+      bool delete_message(message id);
+      bool delete_channel(channel id);
+      bool remove_admin(client id);
+      bool unban_client(client id);
+      bool remove_client(client id);
+
+
+      //update
+      bool update_channel(channel id, new title, new password , new orderPos);
+      bool update_banned_client(client id, reason, banDuration);
+      bool update_client(client id, nickname);
+
+
+      //search
+      bool is_client_id_exists(client id);
+      bool is_client_identity_exists(identity);
+      string get_ban_list();
+      bool is_client_banned(client id);
+      bool is_client_admin(client id);
+      string get_channels();
+      /// ->>>> RAM or FOR LOOPS get_online_clients();
+      bool is_channel_password_correct(channel id, entered password);
+      bool is_channel_locked(channel id);
+
+-----------------------------------------------------
+    network:
+      init();
+
+
+      type of data:
+        IN(RECEIVE): REQUEST, PING
+        OUT(SEND): RESPONSE(NOTIF) , PONG
+        BOTH: VOICE, TEXT
+
+      receive:
+
+      send:
+        types of send: ALL,CHANNEL,SELF:
+            VOICE: (sender id, voice)
+              sender id -> channel id; broadcast to clients in that channel except sender
+
+            TEXT: (sender id, message, time)
+              sender id -> channel id; broadcast to all clients in that channel
+
+            enum targetType (ALL,SELF,CHANNEL)
+            NOTIF/RESPONSE: (client id, response code, targetType)
+              switch(targetType)
+                case CHANNEL:
+                  client id -> channel id; brodcast response code to channel.
+                case SELF:
+                  send response code to client id
+                case ALL:
+                  send to all clients are inside connected list except those connection lost status == true
+                default: exception.
+
+---------------------------------------------------
+*/
