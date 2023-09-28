@@ -3,6 +3,11 @@
 
 
 #define SVC_DATABASE_NAME "svc_server.db"
+#define SVC_SERVER_TEXT_PORT 8888
+#define SVC_SERVER_VOICE_PORT 8889
 
+
+#define SVC_VOICE_FRAMES_PER_BUFFER 1024
+// #define SVC_VOICE_SAMPLE_RATE 44100
 
 #endif

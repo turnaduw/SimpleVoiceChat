@@ -13,7 +13,6 @@ namespace SimpleVoiceChat
       if(!db_existant)
         init_tables();
 
-      new_client("client A", "identityAAA");
     }
   }
 
@@ -69,9 +68,11 @@ namespace SimpleVoiceChat
     const char* createBanList = "CREATE TABLE IF NOT EXISTS svc_banlist("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "client_id INTEGER NOT NULL,"
+    "admin_id INTEGER NOT NULL,"
     "banDuration INTEGER,"
     "reason TEXT,"
     "commit_date DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "FOREIGN KEY(admin_id) REFERENCES svc_admins(id),"
     "FOREIGN KEY(client_id) REFERENCES svc_clients(id));";
     rc = sqlite3_exec(db, createBanList, nullptr, 0, &errMsg);
     if (rc != SQLITE_OK)
@@ -84,6 +85,7 @@ namespace SimpleVoiceChat
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "nickname TEXT,"
     "identity TEXT NOT NULL,"
+    "ip_port TEXT,"
     "total_connection_count INTEGER DEFAULT 0,"
     "account_creation DATETIME DEFAULT CURRENT_TIMESTAMP);";
     rc = sqlite3_exec(db, createClients, nullptr, 0, &errMsg);
@@ -105,7 +107,6 @@ namespace SimpleVoiceChat
         {
             std::cout << "SQL error: " << errMsg << "\tquery=" << _q << std::endl;
             sqlite3_free(errMsg);
-            result = false;
         }
         else
           result = true;
@@ -119,8 +120,11 @@ namespace SimpleVoiceChat
     std::string* _result = static_cast<std::string*>(data);
     for (int i = 0; i < argc; i++)
     {
-        // std::cout << azColName[i] << '=' << (argv[i] ? argv[i] : "NULL") << std::endl;
-        // *_result += azColName[i] + '=' + (argv[i] ? argv[i] : "NULL") + "\n";
+        // std::cout << "i=" << i  << "\t"<< azColName[i] << '=' << (argv[i] ? argv[i] : "NULL") << std::endl;
+        *_result += azColName[i];
+        *_result += '=';
+        *_result +=  (argv[i] ? argv[i] : "NULL");
+        *_result += "\n";
     }
     std::cout << std::endl;
     return 0;
@@ -130,18 +134,12 @@ namespace SimpleVoiceChat
     char* final_query = new char[_q.length()+1];
     std::strcpy(final_query, _q.c_str());
 
-    // bool exists=false;
     std::string result;
-
-    // if(outputType==false)
-      // rc = sqlite3_exec(db, final_query, search_in_db_checkExistantData_callback, &exists , &errMsg);
-    // else
     int rc = sqlite3_exec(db, final_query, &SVCdb::search_in_db_callback, &result , &errMsg);
     if (rc != SQLITE_OK)
     {
         std::cout << "SQL search error: " << errMsg << "\tquery=" << _q << std::endl;
         sqlite3_free(errMsg);
-        // return 1;
     }
     return result;
   }
@@ -171,12 +169,10 @@ namespace SimpleVoiceChat
     basic_query += std::to_string(client_id) + "', '" + std::to_string(admin_id) + "', '" + reason + "', '" + std::to_string(banDuration)+ "');";
     return query_to_db(basic_query);
   }
-
-
-  bool SVCdb::new_client(std::string nickname, std::string identity)
+  bool SVCdb::new_client(std::string nickname, std::string identity, std::string ip_port)
   {
-    std::string basic_query = "INSERT INTO svc_clients (nickname,identity) VALUES('";
-    basic_query += nickname + "', '" + identity + "');";
+    std::string basic_query = "INSERT INTO svc_clients (nickname,identity,ip_port) VALUES('";
+    basic_query += nickname + "', '" + identity +  "', '" + ip_port + "');";
     return query_to_db(basic_query);
   }
 
@@ -235,55 +231,95 @@ namespace SimpleVoiceChat
 
 
   //search
+  template <typename T>
+  bool SVCdb::check_id_returned(T& id, std::string& basic_query)
+  {
+        std::string result_id = search_in_db(basic_query);
+        /*
+        the query is return a string as result_id
+        that variable context is like:   id=10 or identity=fuiewrg.. or ip_port=120.0.0.0..
+        so if length result_id is less than 3, query result is not vaild id and not found.
+        as using template calling <T> id so maybe its be dirffrent
+        */
+
+        if (std::is_integral_v<T>)
+        {
+          if(result_id.length() < 4) //id=xx.. length minimum is 4
+            return false;
+          else
+            return true;
+        }
+        else
+        {
+          if(result_id.length() > 10) //identity and ip_port length are more than 10
+            return true;
+          else
+            return false;
+        }
+  }
   bool SVCdb::is_client_id_exists(int client_id)
   {
-    std::string basic_query = "SELECT nickname FROM svc_clients WHERE id=";
+    std::string basic_query = "SELECT id FROM svc_clients WHERE id=";
     basic_query += std::to_string(client_id) + ";";
-    return false;
-    // search_in_db(basic_query);
+    return check_id_returned(client_id, basic_query);
   }
   bool SVCdb::is_client_identity_exists(std::string identity)
   {
-    std::string basic_query = "SELECT nickname FROM svc_clients WHERE identity=";
-    basic_query += identity + ";";
-    return false;
+    std::string basic_query = "SELECT identity FROM svc_clients WHERE identity='";
+    basic_query += identity + "';";
+    return check_id_returned(identity, basic_query);
+  }
+  bool SVCdb::is_client_ip_port_exists(std::string ip_port)
+  {
+    std::string basic_query = "SELECT ip_port FROM svc_clients WHERE ip_port='";
+    basic_query += ip_port + "';";
+    return check_id_returned(ip_port, basic_query);
   }
   bool SVCdb::is_client_banned(int client_id)
   {
-    std::string basic_query = "SELECT id FROM svc_banlist WHERE client_id=";
-    basic_query += client_id + ";";
-    return false;
+    std::string basic_query = "SELECT id FROM svc_banlist WHERE client_id='";
+    basic_query += std::to_string(client_id) + "';";
+    return check_id_returned(client_id, basic_query);
   }
   bool SVCdb::is_client_admin(int client_id)
   {
-    std::string basic_query = "SELECT id FROM svc_admins WHERE client_id=";
-    basic_query += client_id + ";";
-    return false;
+    std::string basic_query = "SELECT id FROM svc_admins WHERE client_id='";
+    basic_query += std::to_string(client_id) + "';";
+    return check_id_returned(client_id, basic_query);
   }
   bool SVCdb::is_channel_password_correct(int channel_id, std::string entered_password)
   {
-    std::string password;
-    std::string basic_query = "SELECT password FROM svc_channels WHERE id=";
-    basic_query += channel_id + ";";
-
-    if(password.length() > 0)
-    {
-      if(entered_password == password)
-        return true;
-      else
-        return false;
-    }
-    return true; //means channel is not locked
+    std::string basic_query = "SELECT id FROM svc_channels WHERE id='";
+    basic_query += std::to_string(channel_id) + "' AND password='" + entered_password + "';";
+    return check_id_returned(channel_id, basic_query);
   }
+
+
+
+
+
+
+
+
+
   std::string SVCdb::get_channels()
   {
     std::string basic_query = "SELECT * FROM svc_channels;";
-    std::cout << "result get channels is " << search_in_db(basic_query);
-    return "";
+    return search_in_db(basic_query);
   }
   std::string SVCdb::get_ban_list()
   {
     std::string basic_query = "SELECT * FROM svc_banlist;";
-    return "";
+    return search_in_db(basic_query);
+  }
+  std::string SVCdb::get_saved_clients()
+  {
+    std::string basic_query = "SELECT * FROM svc_clients;";
+    return search_in_db(basic_query);
+  }
+  std::string SVCdb::get_admins()
+  {
+    std::string basic_query = "SELECT * FROM svc_admins;";
+    return search_in_db(basic_query);
   }
 }
