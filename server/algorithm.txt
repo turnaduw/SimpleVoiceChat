@@ -5,17 +5,20 @@ NOTE.on each of client request/message/sound/packet has a client sent will check
 
 
 CLIENT REQUEST CODES:
-  01.connect to the server
-  02.disconnect from server
-  03.send identity
-  04.connect to the channel
-  05.leave the channel
-  06.send entered channel password
-  07.send text message to the channel
-  08.send voice message to the channel
-  09.create channel
-  10.delete channel
-  11.update channel
+  A.send identity (nickname,identity)
+  B.disconnect from server
+  C.connect to the channel (channel_id,password)
+  D.leave the channel
+  F.send text message to the channel (text)
+  G.create channel (title,password,position)
+  H.delete channel (channel id)
+  I.update channel (channel_id,title, password . position)
+  J.rename nickname (new nickname)
+  K.speaker mute
+  k.speaker unmute
+  L.microphone mute
+  l.microphone unmute
+  //O.ban cleint (cleint id ...)
 
 
 SERVER RESPONSE:

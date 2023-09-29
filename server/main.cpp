@@ -11,6 +11,11 @@ using boost::asio::ip::udp;
 //to save received audio as buffer
 #include <boost/array.hpp>
 
+//codes are in text-process.cpp
+//to delimite and action received text.
+void text_process(std::string&, SimpleVoiceChat::SVCdb&,
+  std::string,unsigned int, bool);
+
 
 void sendData(const boost::asio::ip::address& _ip, const unsigned short& _port, const std::string& _message, udp::socket& _socket)
 {
@@ -18,7 +23,7 @@ void sendData(const boost::asio::ip::address& _ip, const unsigned short& _port, 
   _socket.send_to(boost::asio::buffer(_message), send_endpoint);
 }
 
-void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& dB)
+void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
 {
     while (true)
     {
@@ -31,23 +36,21 @@ void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& dB)
 
         //set received data into buffer.
         size_t receive_length = socket.receive_from(boost::asio::buffer(receive_data), receive_endpoint);
-        std::cout << "text data = " << std::string(receive_data, receive_length) << std::endl;
+        std::string rdata(receive_data, receive_length);
+        std::cout << "text data = " << rdata << std::endl;
         std::cout << "\n\n\n";
 
 
         const unsigned short c_port = receive_endpoint.port();
         const boost::asio::ip::address c_ip = receive_endpoint.address();
-
-
-        // std::string ip_port = c_ip.to_string() + ":" + std::to_string(c_port);
-        // if(dB.is_client_ip_port_exists(ip_port))
-
+          text_process(rdata,db, c_ip.to_string(),c_port,
+                db.cc_isConnected_ip_port(c_ip.to_string(), c_port));
     }
 }
 
 
 
-void receive_voice(udp::socket& socket)
+void receive_voice(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
 {
     while (true)
     {
@@ -64,6 +67,10 @@ void receive_voice(udp::socket& socket)
 
         //set received data into buffer.
         socket.receive_from(boost::asio::buffer(audioBuffer), receive_endpoint);
+        const unsigned short c_port = receive_endpoint.port();
+        const boost::asio::ip::address c_ip = receive_endpoint.address();
+        std::string sender_address = std::to_string(c_port) + c_ip.to_string();
+
     }
 }
 
@@ -78,50 +85,6 @@ int main()
     //init or open database and handel INSERT/DELETE/UPDATE/... data by functions.
     SimpleVoiceChat::SVCdb db(boost::filesystem::exists(SVC_DATABASE_NAME));
 
-    db.create_channel("channel a","",1);
-    db.create_channel("channel c","1234",2);
-    db.create_channel("channel b","78944ABCD",3);
-
-    db.update_channel(1,"channel a","password 1",1);
-    db.delete_channel(1);
-    std::cout << db.get_channels() << std::endl;
-
-
-    db.new_client("Max","identitiyMax","127.0.0.0:45612");
-    db.new_client("Paul","identitiyPaul","127.0.0.0:10001");
-    db.remove_client(2);
-    std::cout << db.get_saved_clients() << std::endl;
-
-
-
-
-    db.new_admin(1);
-    std::cout << db.get_admins() << std::endl;
-
-
-
-
-    db.ban_client(2,1,"you are not allowed.",1024);
-    std::cout << db.get_ban_list() << std::endl;
-
-    std::cout << "clinet 2 banned status = " << db.is_client_banned(2) << std::endl;
-    std::cout << "clinet 1 banned status = " << db.is_client_banned(1) << std::endl;
-
-    std::cout << "clinet 1 is_client_id_exists status = " << db.is_client_id_exists(1) << std::endl;
-    std::cout << "clinet 10 is_client_id_exists status = " << db.is_client_id_exists(10) << std::endl;
-
-    std::cout << "clinet identitiyMax status = " << db.is_client_identity_exists("identitiyMax") << std::endl;
-    std::cout << "clinet identitiyMax2 status = " << db.is_client_identity_exists("identitiyMax2") << std::endl;
-
-
-    std::cout << "clinet A is_client_ip_port_exists status = " << db.is_client_ip_port_exists("127.0.0.0:45612") << std::endl;
-    std::cout << "clinet B is_client_ip_port_exists status = " << db.is_client_ip_port_exists("127.0.0.1:45612") << std::endl;
-
-
-
-    std::cout << "channel lock status = " << (db.is_channel_password_correct(2,"1234") ? "allowed" : "denied") << std::endl;
-
-
     //network to receive data
     boost::asio::io_context io_context;
     udp::socket socket_text(io_context, udp::endpoint(udp::v4(), SVC_SERVER_TEXT_PORT));
@@ -130,7 +93,7 @@ int main()
 
     boost::asio::io_service io_service;
     udp::socket socket_voice(io_service, udp::endpoint(udp::v4(), SVC_SERVER_VOICE_PORT));
-    boost::thread receive_voice_thread(boost::bind(receive_voice, boost::ref(socket_voice)));
+    boost::thread receive_voice_thread(boost::bind(receive_voice, boost::ref(socket_voice), boost::ref(db)));
 
 
 
