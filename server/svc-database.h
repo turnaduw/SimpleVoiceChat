@@ -37,10 +37,10 @@ namespace SimpleVoiceChat
       sqlite3* db;
       char* errMsg = nullptr;
       void init_tables();
-      std::vector<CONNECTED_CLIENTS> connected_clients;
 
 
     public:
+      std::vector<CONNECTED_CLIENTS> connected_clients;
 
       SVCdb(bool);
       ~SVCdb();

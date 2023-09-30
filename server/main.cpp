@@ -11,17 +11,9 @@ using boost::asio::ip::udp;
 //to save received audio as buffer
 #include <boost/array.hpp>
 
-//codes are in text-process.cpp
-//to delimite and action received text.
+//codes are in text-process.cpp, to delimite and action received text.
 void text_process(std::string&, SimpleVoiceChat::SVCdb&,
-  std::string,unsigned int, bool);
-
-
-void sendData(const boost::asio::ip::address& _ip, const unsigned short& _port, const std::string& _message, udp::socket& _socket)
-{
-  udp::endpoint send_endpoint(_ip, _port);
-  _socket.send_to(boost::asio::buffer(_message), send_endpoint);
-}
+  std::string,unsigned int, bool,udp::socket&);
 
 void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
 {
@@ -36,15 +28,13 @@ void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
 
         //set received data into buffer.
         size_t receive_length = socket.receive_from(boost::asio::buffer(receive_data), receive_endpoint);
+
         std::string rdata(receive_data, receive_length);
-        std::cout << "text data = " << rdata << std::endl;
-        std::cout << "\n\n\n";
-
-
         const unsigned short c_port = receive_endpoint.port();
         const boost::asio::ip::address c_ip = receive_endpoint.address();
-          text_process(rdata,db, c_ip.to_string(),c_port,
-                db.cc_isConnected_ip_port(c_ip.to_string(), c_port));
+
+        text_process(rdata,db, c_ip.to_string(),c_port,
+                db.cc_isConnected_ip_port(c_ip.to_string(), c_port),socket);
     }
 }
 
