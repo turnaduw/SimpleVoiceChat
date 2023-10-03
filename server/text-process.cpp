@@ -16,6 +16,30 @@ int findIndexOfChar(const std::string& str, const char& c)
     return -1;
 }
 
+bool spliter(char delimiter, std::string text, std::string& a, std::string& b, unsigned int& f)
+{
+
+  int index = findIndexOfChar(text,delimiter);
+  if(index==-1)
+    return false;
+  a = text.substr(SVC_SERVER_REQUEST_CODE_INDEX,index-SVC_SERVER_REQUEST_CODE_INDEX);
+
+  text = text.substr(index+1,text.length());
+  index = findIndexOfChar(text,delimiter); //Œ
+  if(index==-1)
+    return false;
+
+  b = text.substr(0, index);
+  std::string c = text.substr(index+1, text.length());
+
+  const char* cxx = c.c_str();
+  f = std::atoi(cxx);
+
+  return true;
+
+}
+
+
 bool spliter(char delimiter, std::string text, std::string& a, std::string& b, int& f)
 {
 
@@ -84,7 +108,7 @@ bool spliter(char delimiter, std::string& text, int& a, std::string& b)
   if(index==-1)
     return false;
 
-  std::string temp = text.substr(SVC_SERVER_REQUEST_CODE_INDEX,index-SVC_SERVER_REQUEST_CODE_INDEX);
+  std::string temp = text.substr(2,index-1);
   const char* cxx = temp.c_str();
   a = std::atoi(cxx);
 
@@ -171,7 +195,7 @@ void send_text(
         if(i.client_connected_channel_id == targeted_channel_id)
         {
           boost::asio::ip::address ip_address = boost::asio::ip::address::from_string(i.client_ip);
-          udp::endpoint send_endpoint(ip_address, i.client_port);
+          udp::endpoint send_endpoint(ip_address, i.client_text_port);
           _socket.send_to(boost::asio::buffer(message), send_endpoint);
         }
       }
@@ -181,7 +205,7 @@ void send_text(
       for (auto i: connected_clients)
       {
         boost::asio::ip::address ip_address = boost::asio::ip::address::from_string(i.client_ip);
-        udp::endpoint send_endpoint(ip_address, i.client_port);
+        udp::endpoint send_endpoint(ip_address, i.client_text_port);
         _socket.send_to(boost::asio::buffer(message), send_endpoint);
       }
     }break;
@@ -195,21 +219,23 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
   std::string ip, unsigned int port,
   bool connected, udp::socket& _socket)
 {
+  const int INDEX_REQUEST_CODE = 1;
   if(connected==false)
-    if(text[2] != 'A')
-      text[2] = 'A';
+    if(text[INDEX_REQUEST_CODE] != 'A')
+      text[INDEX_REQUEST_CODE] = 'A';
 
-
-  switch (text[2])
+  switch (text[INDEX_REQUEST_CODE])
   {
     case 'A':
     {
       // A.send identity
-      if(db.cc_isConnected_ip_port(ip,port)) //client is exists.
+      if(db.cc_isConnected_text_ip_port(ip,port)) //client is exists.
         return;
 
       std::string nickname,identity;
-      if(spliter(SVC_SERVER_REQUEST_DELIMITER,text,nickname,identity))
+      unsigned int port_voice;
+
+      if(spliter(SVC_SERVER_REQUEST_DELIMITER,text,nickname,identity,port_voice))
       {
           if(identity.length() < SVC_SERVER_MINIMUM_ACCEPTED_IDENTITY_LENGTH)
           {
@@ -218,7 +244,7 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
             // std::cout << "client has sent an invalid identity. rejected.\n";
             return;
           }
-          db.new_client(nickname,identity,ip,port);
+          db.new_client(nickname,identity,ip,port,port_voice);
           // std::cout << "clients saved list=:\n" << db.get_saved_clients() << std::endl;
           // db.cc_print_clients();
           send_text(MAS_CLIENT_CONNECTED, RC_CONNECTED, SendTarget::ALL, 0,
@@ -334,7 +360,9 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
           {
             if(db.insert_text_message(cid,channel_id,message))
             {
-                send_text(message, RC_TEXT_MESSAGE, SendTarget::CHANNEL, channel_id,
+              std::string _name = db.cc_getClient_nickname(cid);
+              std::string _message = _name + message + "\n";
+                send_text(_message, RC_TEXT_MESSAGE, SendTarget::CHANNEL, channel_id,
                       _socket,db.connected_clients,ip,port);
                 // std::cout << "client has been sent message to channel fine.\n";
             }
@@ -365,6 +393,7 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
               db.create_channel(title,password,pos);
               send_text(MAS_CHANNEL_CREATED, RC_CHANNEL_CREATED, SendTarget::ALL, 0,
                     _socket,db.connected_clients,ip,port);
+
               // std::cout << "channel created.." << db.get_channels() << std::endl;
             }
             else
@@ -494,7 +523,7 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
       else
       {
         db.cc_speaker_muted(cid,true);
-        send_text(MAS_CLIENT_SPEAKER_MUTED, RC_CLIENT_SPEAKER_MUTED, SendTarget::ALL, 0,
+        send_text(MAS_CLIENT_SPEAKER_MUTED, RC_CLIENT_SPEAKER_MUTED, SendTarget::CLIENT, 0,
               _socket,db.connected_clients,ip,port);
         // std::cout << "client speaker_muted.\n";
       }
@@ -508,7 +537,7 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
       else
       {
         db.cc_speaker_muted(cid,false);
-        send_text(MAS_CLIENT_SPEAKER_UNMUTED, RC_CLIENT_SPEAKER_UNMUTED, SendTarget::ALL, 0,
+        send_text(MAS_CLIENT_SPEAKER_UNMUTED, RC_CLIENT_SPEAKER_UNMUTED, SendTarget::CLIENT, 0,
               _socket,db.connected_clients,ip,port);
         // std::cout << "client speaker_unmuted.\n";
       }
@@ -522,7 +551,7 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
       else
       {
         db.cc_micophone_muted(cid,true);
-        send_text(MAS_CLIENT_MICROPHONE_MUTED, RC_CLIENT_MICROPHONE_MUTED, SendTarget::ALL, 0,
+        send_text(MAS_CLIENT_MICROPHONE_MUTED, RC_CLIENT_MICROPHONE_MUTED, SendTarget::CLIENT, 0,
               _socket,db.connected_clients,ip,port);
         // std::cout << "client microphone_nmuted.\n";
       }
@@ -536,11 +565,18 @@ void text_process(std::string& text, SimpleVoiceChat::SVCdb& db,
       else
       {
         db.cc_micophone_muted(cid,false);
-        send_text(MAS_CLIENT_MICROPHONE_UNMUTED, RC_CLIENT_MICROPHONE_UNMUTED, SendTarget::ALL, 0,
+        send_text(MAS_CLIENT_MICROPHONE_UNMUTED, RC_CLIENT_MICROPHONE_UNMUTED, SendTarget::CLIENT, 0,
               _socket,db.connected_clients,ip,port);
         // std::cout << "client microphone_unmuted.\n";
       }
     }break;
+
+    // case 'M':
+    // {
+    //   // M.ban client
+    //
+    // }break;
+
 
 
 

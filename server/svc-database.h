@@ -21,7 +21,8 @@ namespace SimpleVoiceChat
     int client_id;
     std::string client_name;
     std::string client_ip;
-    unsigned int client_port;
+    unsigned int client_text_port;
+    unsigned int client_voice_port;
     int client_connected_channel_id;
 
     // std::string last_time_activity;
@@ -52,15 +53,17 @@ namespace SimpleVoiceChat
 
       //cc-> connected clients , not Database just to vector<struct>
       void cc_print_clients();
-      bool cc_connect(int,std::string,std::string,unsigned int, int, short int, bool,bool);
+      bool cc_connect(int,std::string,std::string,unsigned int,unsigned int, int, short int, bool,bool);
       bool cc_disconnect(int);
       bool cc_rename(int id, std::string new_name);
       bool cc_speaker_muted(int,bool);
       bool cc_micophone_muted(int,bool);
       bool cc_channel(int,int); //switch channel
       int cc_getClient_channel(int);
+      std::string cc_getClient_nickname(int);
       bool cc_ping(int,short int);
-      bool cc_isConnected_ip_port(std::string,unsigned int);
+      bool cc_isConnected_text_ip_port(std::string,unsigned int);
+      bool cc_isConnected_voice_ip_port(std::string,unsigned int);
       int cc_what_is_id(std::string, unsigned int);
       int cc_what_is_index_vector(int);
       bool cc_channel_deleted_kick_all_out(int);
@@ -70,7 +73,7 @@ namespace SimpleVoiceChat
       bool create_channel(std::string, std::string , int);
       bool new_admin(int);
       bool ban_client(int, int, std::string, int);
-      bool new_client(std::string, std::string,std::string,unsigned int);
+      bool new_client(std::string, std::string,std::string,unsigned int,unsigned int);
 
       //delete
       bool delete_message(int);

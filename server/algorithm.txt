@@ -31,7 +31,6 @@ SERVER RESPONSE:
   G.channels detail (incude clients in channel) (SELF)
 
   H.text message (CHANNEL)
-  //I.voice message (CHANNEL)
 
   J.invaild request code or syntax. (self)
   K.invalid channel id received, retry.. (SELF)
@@ -40,13 +39,19 @@ SERVER RESPONSE:
   N.incorrect passwrod for the channel (SELF)
   O.text message: channel is empty, no one cant hear you. (SELF)
   P.text message: tell client you are not in a channel (SELF)
-  //Q.voice message: tell client no one hears you.. you are alone in channel (SELF)
-  //R.voice message: tell client you are not in a channel (SELF)
   S.channel created. (ALL)
   T.channel deleted. (ALL)
   V.channel updated. (ALL)
   U.client banned/kicked (ALL)
   W.you are not admin no permission  (SELF)
+
+
+
+
+voice:
+//I.voice message (CHANNEL)
+//Q.voice message: tell client no one hears you.. you are alone in channel (SELF)
+//R.voice message: tell client you are not in a channel (SELF)
 
 
 

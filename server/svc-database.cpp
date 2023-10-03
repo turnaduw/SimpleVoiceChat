@@ -152,12 +152,13 @@ namespace SimpleVoiceChat
   bool SVCdb::cc_connect(int id,
     std::string name,
     std::string ip,
-    unsigned int port,
+    unsigned int port_text,
+    unsigned int port_voice,
     int channel_id=0,
     short int ping=0,
     bool speaker_muted=false,bool microphone_muted=false)
   {
-    SimpleVoiceChat::CONNECTED_CLIENTS client = {id,name,ip,port,channel_id,ping,speaker_muted,microphone_muted};
+    SimpleVoiceChat::CONNECTED_CLIENTS client = {id,name,ip,port_text,port_voice,channel_id,ping,speaker_muted,microphone_muted};
     connected_clients.push_back(client);
     std::cout << "new client added to connected_clients_list.\n";
     return true;
@@ -244,7 +245,8 @@ namespace SimpleVoiceChat
       std::cout << "\nclient id=" <<i.client_id
                 << "\nclient nickname=" <<i.client_name
                 << "\nclient ip=" <<i.client_ip
-                << "\nclient port=" <<i.client_port
+                << "\nclient text port=" <<i.client_text_port
+                << "\nclient voice port=" << i.client_voice_port
                 << "\nclient channel=" <<i.client_connected_channel_id
                 << "\nclient ping=" <<i.ping
                 << "\nclient speaker muted=" <<i.client_speaker_muted
@@ -253,12 +255,25 @@ namespace SimpleVoiceChat
     }
     std::cout << "\n================================\n";
   }
-  bool SVCdb::cc_isConnected_ip_port(std::string ip, unsigned int port)
+  bool SVCdb::cc_isConnected_text_ip_port(std::string ip, unsigned int port)
   {
     for (int i = 0; i < connected_clients.size(); i++)
     {
       if(connected_clients[i].client_ip == ip &&
-            connected_clients[i].client_port == port)
+            connected_clients[i].client_text_port == port)
+      {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool SVCdb::cc_isConnected_voice_ip_port(std::string ip, unsigned int port)
+  {
+    for (int i = 0; i < connected_clients.size(); i++)
+    {
+      if(connected_clients[i].client_ip == ip &&
+            connected_clients[i].client_voice_port == port)
       {
         return true;
       }
@@ -270,7 +285,7 @@ namespace SimpleVoiceChat
     for (int i = 0; i < connected_clients.size(); i++)
     {
       if(connected_clients[i].client_ip == ip &&
-            connected_clients[i].client_port == port)
+            connected_clients[i].client_text_port == port)
       {
         return connected_clients[i].client_id;
       }
@@ -292,13 +307,25 @@ namespace SimpleVoiceChat
   {
     int index = cc_what_is_index_vector(id);
     if(index==-1)
-      std::cout << "cc_ping client is not connected.\n";
+      std::cout << "cc_getClient_channel client is not connected.\n";
     else
     {
       return connected_clients[index].client_connected_channel_id;
     }
     return -1;
   }
+  std::string SVCdb::cc_getClient_nickname(int id)
+  {
+    int index = cc_what_is_index_vector(id);
+    if(index==-1)
+      std::cout << "cc_getClient_nickname client is not connected.\n";
+    else
+    {
+      return connected_clients[index].client_name + "(" + std::to_string(id) + "): ";
+    }
+    return "unknwon-nickname (" + std::to_string(id) + "): ";
+  }
+
   bool SVCdb::cc_channel_deleted_kick_all_out(int channel_id)
   {
     for (auto i: connected_clients)
@@ -350,7 +377,7 @@ namespace SimpleVoiceChat
     return query_to_db(basic_query);
   }
   bool SVCdb::new_client(std::string nickname, std::string identity,
-      std::string ip, unsigned int port)
+      std::string ip, unsigned int port_text,unsigned int port_voice)
   {
     std::string basic_query = "INSERT INTO svc_clients (nickname,identity) VALUES('";
     basic_query += nickname + "', '" + identity +  "');";
@@ -365,7 +392,7 @@ namespace SimpleVoiceChat
       const char* cxx = temp_id.c_str();
       int c_id = std::atoi(cxx);
 
-      cc_connect(c_id,nickname,ip,port);
+      cc_connect(c_id,nickname,ip,port_text,port_voice);
 
 
       #if DEBUG_TOOL_MAKE_ALL_CLIENTS_ADMIN == 1

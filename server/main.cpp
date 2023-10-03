@@ -15,6 +15,14 @@ using boost::asio::ip::udp;
 void text_process(std::string&, SimpleVoiceChat::SVCdb&,
   std::string,unsigned int, bool,udp::socket&);
 
+
+//codes are in voice-process.cpp
+void voice_process(const boost::array<float, SVC_VOICE_FRAMES_PER_BUFFER>&,
+                   const std::vector<SimpleVoiceChat::CONNECTED_CLIENTS>&,
+                   std::string, unsigned int, bool connected, udp::socket&);
+
+
+#include <boost/core/demangle.hpp>
 void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
 {
     while (true)
@@ -25,6 +33,13 @@ void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
         //sender information
         udp::endpoint receive_endpoint;
 
+        // std::string receivedString(boost::asio::buffer_cast<char*>(buffer), boost::asio::buffer_size(buffer));
+        // std::vector<float> receivedVector(reinterpret_cast<float*>(boost::asio::buffer_cast<char*>(buffer) + receivedString.size()),
+                                          // reinterpret_cast<float*>(boost::asio::buffer_cast<char*>(buffer) + boost::asio::buffer_size(buffer)));
+
+
+
+
 
         //set received data into buffer.
         size_t receive_length = socket.receive_from(boost::asio::buffer(receive_data), receive_endpoint);
@@ -32,9 +47,10 @@ void receive_text(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
         std::string rdata(receive_data, receive_length);
         const unsigned short c_port = receive_endpoint.port();
         const boost::asio::ip::address c_ip = receive_endpoint.address();
+        std::string _ip = c_ip.to_string();
 
-        text_process(rdata,db, c_ip.to_string(),c_port,
-                db.cc_isConnected_ip_port(c_ip.to_string(), c_port),socket);
+        text_process(rdata,db, _ip,c_port,
+                db.cc_isConnected_text_ip_port(_ip, c_port),socket);
     }
 }
 
@@ -51,15 +67,14 @@ void receive_voice(udp::socket& socket,SimpleVoiceChat::SVCdb& db)
         //sender information
         udp::endpoint receive_endpoint;
 
-        std::cout << "voice received.\n";
-        std::cout << "\n\n\n";
-
-
         //set received data into buffer.
         socket.receive_from(boost::asio::buffer(audioBuffer), receive_endpoint);
         const unsigned short c_port = receive_endpoint.port();
         const boost::asio::ip::address c_ip = receive_endpoint.address();
-        std::string sender_address = std::to_string(c_port) + c_ip.to_string();
+
+        std::string _ip = c_ip.to_string();
+        voice_process(audioBuffer,db.connected_clients, _ip,c_port,
+                db.cc_isConnected_voice_ip_port(_ip, c_port),socket);
 
     }
 }
