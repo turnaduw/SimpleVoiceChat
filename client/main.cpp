@@ -56,16 +56,14 @@ static int send_voice(const void* inputBuffer, void* outputBuffer,
                          PaStreamCallbackFlags statusFlags,
                          void* userData)
 {
-    if(!microphone_is_muted)
-    {
       // Cast the input buffer to the desired format
       const float* in = static_cast<const float*>(inputBuffer);
 
       boost::asio::ip::udp::endpoint udpEndpoint(boost::asio::ip::address::from_string(server_ip), server_voice_port);
 
       // Send the audio data to the server
-      socket_voice.send_to(boost::asio::buffer(in, sizeof(float) * framesPerBuffer), udpEndpoint);
-    }
+      if(!microphone_is_muted)
+        socket_voice.send_to(boost::asio::buffer(in, sizeof(float) * framesPerBuffer), udpEndpoint);
     return paContinue;
 }
 
@@ -129,23 +127,21 @@ static int receive_voice(const void* inputBuffer, void* outputBuffer,
                          PaStreamCallbackFlags statusFlags,
                          void* userData)
 {
-    if(!speaker_is_muted)
-    {
       // Cast the output buffer to the desired format
       float* out = static_cast<float*>(outputBuffer);
 
       // Receive audio data from client
       boost::array<float, FRAMES_PER_BUFFER> recvBuffer;
       boost::asio::ip::udp::endpoint senderEndpoint;
-      socket_voice.receive_from(boost::asio::buffer(recvBuffer), senderEndpoint);
+      if(!speaker_is_muted)
+        socket_voice.receive_from(boost::asio::buffer(recvBuffer), senderEndpoint);
 
-      for(int i=0;i<=99;i++)
-        std::cout << recvBuffer[i] << " ";
+      // for(int i=0;i<=99;i++)
+        // std::cout << recvBuffer[i] << " ";
 
       // Copy received audio data to the output buffer
       std::copy(recvBuffer.begin(), recvBuffer.end(), out);
 
-    }
     return paContinue;
 }
 
@@ -322,8 +318,55 @@ int main()
                 }
             }
 
-      PaStream* microphone_stream;
-      Pa_OpenDefaultStream(&microphone_stream, 1, 0, paFloat32, SAMPLE_RATE, FRAMES_PER_BUFFER, send_voice, nullptr);
+
+            // Get the index of the default input device
+                int defaultInputDevice = Pa_GetDefaultInputDevice();
+                if (defaultInputDevice == paNoDevice) {
+                    std::cerr << "No default input device found." << std::endl;
+                    Pa_Terminate();
+                    return 1;
+                }
+
+                // Get the name of the default input device
+                const PaDeviceInfo* deviceInfo = Pa_GetDeviceInfo(defaultInputDevice);
+                std::string inputDeviceName = deviceInfo->name;
+                std::cout << "Current input device: " << inputDeviceName << std::endl;
+
+
+
+                PaStreamParameters inputParameters;
+                inputParameters.device = Pa_GetDefaultInputDevice();  // Use the default input device
+                inputParameters.channelCount = 1;
+                inputParameters.sampleFormat = paFloat32;
+                inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultHighInputLatency;
+                inputParameters.hostApiSpecificStreamInfo = nullptr;
+
+                PaStream* microphone_stream;
+                PaError err = Pa_OpenStream(&microphone_stream, &inputParameters, nullptr, SAMPLE_RATE, FRAMES_PER_BUFFER, paNoFlag, send_voice, nullptr);
+                if (err != paNoError) {
+                    std::cerr << "Error opening PortAudio input stream: " << Pa_GetErrorText(err) << std::endl;
+                    Pa_Terminate();
+                    return 1;
+                }
+
+
+                defaultInputDevice = 1;
+                if (defaultInputDevice == paNoDevice)
+                {
+                    std::cerr << "No default input device found." << std::endl;
+                    Pa_Terminate();
+                    return 1;
+                }
+
+                deviceInfo = Pa_GetDeviceInfo(defaultInputDevice);
+                inputDeviceName = deviceInfo->name;
+                std::cout << "Current input device: " << inputDeviceName << std::endl;
+
+
+
+      // PaStream* microphone_stream;
+      // Pa_OpenDefaultStream(&microphone_stream, 1, 0, paFloat32, SAMPLE_RATE, FRAMES_PER_BUFFER, send_voice, nullptr);
+      std::cout << "def input dev = " << Pa_GetDefaultInputDevice() << std::endl;
       std::cout << "Recording audio from microphone and sending to server..." << std::endl;
       std::cout << "ports= " << port_text << "\t" << port_voice << std::endl;
 
@@ -332,6 +375,21 @@ int main()
       socket_voice.open(endpoint_voice.protocol());
       socket_voice.bind(endpoint_voice);
 
+      // Open a temporary input stream to get the current input device
+      // PaStreamParameters outputParameters;
+      // outputParameters.device = Pa_GetDefaultOutputDevice();  // Use the default input device
+      // outputParameters.channelCount = 1;
+      // outputParameters.sampleFormat = paFloat32;
+      // outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowInputLatency;
+      // outputParameters.hostApiSpecificStreamInfo = nullptr;
+      //
+      // PaStream* speaker_stream;
+      // err = Pa_OpenStream(&speaker_stream, &outputParameters, nullptr, 44100, 256, paNoFlag, receive_voice, nullptr);
+      // if (err != paNoError) {
+      //     std::cerr << "Error opening PortAudio output stream: " << Pa_GetErrorText(err) << std::endl;
+      //     Pa_Terminate();
+      //     return 1;
+      // }
       //play voice
       PaStream* speaker_stream;
       Pa_OpenDefaultStream(&speaker_stream, 0, 1, paFloat32, SAMPLE_RATE, FRAMES_PER_BUFFER, receive_voice, nullptr);
@@ -339,6 +397,7 @@ int main()
 
       Pa_StartStream(microphone_stream);
       Pa_StartStream(speaker_stream);
+
 
 
       init_connection_server_send_identity_n_ports(&socket_text);

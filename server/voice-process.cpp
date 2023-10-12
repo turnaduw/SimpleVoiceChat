@@ -48,22 +48,24 @@ void voice_process (
       return;
     }
 
-
+    std::cout<<"targeted_channel_id="<<targeted_channel_id<<std::endl;
     for (auto i: connected_clients)
     {
       if(i.client_speaker_muted == true)
       {
-        // std::cout << "speaker client is muted.. next person les go check\n";
+        std::cout << "speaker client is muted.. next person les go check\n";
         continue;
       }
-      if(i.client_connected_channel_id == targeted_channel_id)
+      if(i.client_connected_channel_id == targeted_channel_id)// && (i.client_ip != ip && i.client_voice_port != port))
       {
-        if(i.client_ip != ip && i.client_voice_port != port)
+        if(i.client_ip == ip && i.client_voice_port==port)
         {
-          boost::asio::ip::address ip_address = boost::asio::ip::address::from_string(i.client_ip);
-          udp::endpoint send_endpoint(ip_address, i.client_voice_port);
-          _socket.send_to(boost::asio::buffer(audioBuffer), send_endpoint);
+          std::cout << "reciver can not be sender... next person les go check\n";
+          continue;
         }
+        boost::asio::ip::address ip_address = boost::asio::ip::address::from_string(i.client_ip);
+        udp::endpoint send_endpoint(ip_address, i.client_voice_port);
+        _socket.send_to(boost::asio::buffer(audioBuffer), send_endpoint);
       }
     }
   }
